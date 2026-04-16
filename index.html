@@ -30,11 +30,6 @@
             50% { background-position: 100% 50% }
             100% { background-position: 0% 50% }
         }
-        /* Убираем 3D стили */
-        /* .perspective-1000 { perspective: 1000px; }
-        .rotate-y-180 { transform: rotateY(180deg); }
-        .preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden { backface-visibility: hidden; } */
     </style>
 </head>
 <body>
@@ -125,17 +120,65 @@
                     return;
                 }
 
-                // Теперь мы можем сразу захватить элемент, так как он отображает текущее состояние
-                 html2canvas(element, { backgroundColor: '#ffffff', scale: 2 })
-                    .then(canvas => {
-                        const link = document.createElement('a');
-                        link.href = canvas.toDataURL('image/png');
-                        link.download = `rasklad-${Date.now()}.png`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
+                // Добавим небольшую задержку, чтобы убедиться, что DOM стабилен
+                setTimeout(() => {
+                    html2canvas(element, { 
+                        backgroundColor: '#ffffff', 
+                        scale: 2,
+                        // Попробуем отключить анимации на время снимка
+                        // https://html2canvas.hertzen.com/configuration
+                        // logging: true, // Для отладки в консоли
+                        useCORS: true, // Полезно для внешних ресурсов, если есть
+                        allowTaint: true // Позволить загрязнение canvas внешними ресурсами
                     })
-                    .catch(err => console.error('Ошибка сохранения:', err));
+                    .then(canvas => {
+                        // Создаем Blob из canvas
+                        canvas.toBlob(function(blob) {
+                            if (!blob) {
+                                console.error('Не удалось создать Blob из canvas.');
+                                return;
+                            }
+
+                            // Создаем URL для Blob
+                            const url = URL.createObjectURL(blob);
+
+                            // Создаем временную ссылку
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `rasklad-${Date.now()}.png`; // Предлагаемое имя файла
+
+                            // Пытаемся "кликнуть" по ссылке
+                            // В TG WebApp это может не сработать напрямую
+                            // Но часто браузер открывает изображение по ссылке, и пользователь может его сохранить
+                            document.body.appendChild(link);
+                            
+                            // Попробуем стандартный способ
+                            try {
+                                link.click();
+                            } catch (err) {
+                                // Если click() не сработал (обычно из-за политики безопасности)
+                                // Откроем изображение в новой вкладке/окне
+                                // В TG это может открыть изображение встроенном браузере
+                                window.open(url, '_blank');
+                            }
+
+                            // Очищаем ресурсы
+                            document.body.removeChild(link);
+                            // Не забудьте освободить URL объекта после использования
+                            setTimeout(() => URL.revokeObjectURL(url), 100); 
+                        }, 'image/png');
+                    })
+                    .catch(err => {
+                        console.error('Ошибка html2canvas:', err);
+                        // Попробуем открыть canvas в новом окне как fallback
+                        // canvas.toBlob(function(blob) {
+                        //     if (blob) {
+                        //         const url = URL.createObjectURL(blob);
+                        //         window.open(url, '_blank');
+                        //     }
+                        // });
+                    });
+                }, 100); // Задержка 100мс
             };
             // --- /ОБНОВЛЁННАЯ ФУНКЦИЯ ---
 
