@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -6,6 +6,8 @@
     <title>Подсказка Интуиции</title>
     <!-- Подключаем Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключаем Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем библиотеки -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -138,7 +140,7 @@
                         .catch(err => console.error('Ошибка сохранения:', err));
                 } else {
                     // Если модальное окно скрыто, временно показываем его, делаем скриншот и прячем обратно
-                    // Это менее предпочтительно, чем мой предыдущий ответ, но работает в рамках одной функции
+                    // Это менее предпочтово, чем мой предыдущий ответ, но работает в рамках одной функции
                     // Однако, в React лучше управлять этим через состояние, как в предыдущем ответе.
                     // Но если мы хотим строго по твоему рабочему примеру, то можно так:
                     // Создадим временный div вне модального окна, скопируем туда содержимое и спрячем
