@@ -30,10 +30,11 @@
             50% { background-position: 100% 50% }
             100% { background-position: 0% 50% }
         }
-        .perspective-1000 { perspective: 1000px; }
+        /* Убираем 3D стили */
+        /* .perspective-1000 { perspective: 1000px; }
         .rotate-y-180 { transform: rotateY(180deg); }
         .preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden { backface-visibility: hidden; }
+        .backface-hidden { backface-visibility: hidden; } */
     </style>
 </head>
 <body>
@@ -116,7 +117,7 @@
                 setCards(prev => prev.map(c => c.id === id ? { ...c, isOpen: !c.isOpen } : c));
             };
 
-            // --- НОВАЯ ФУНКЦИЯ ДЛЯ СКРИНШОТА ---
+            // --- ОБНОВЛЁННАЯ ФУНКЦИЯ ДЛЯ СКРИНШОТА ---
             const captureAndDownload = () => {
                 const element = document.getElementById('screenshot-area');
                 if (!element) {
@@ -124,57 +125,19 @@
                     return;
                 }
 
-                // Проверяем, что модальное окно открыто, чтобы элемент был виден
-                // и html2canvas мог корректно его отрендерить
-                const modal = document.getElementById('screenshot-modal-overlay');
-                if (modal && modal.style.display !== 'none' && modal.style.opacity !== '0') {
-                     html2canvas(element, { backgroundColor: '#ffffff', scale: 2 })
-                        .then(canvas => {
-                            const link = document.createElement('a');
-                            link.href = canvas.toDataURL('image/png');
-                            link.download = `rasklad-${Date.now()}.png`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        })
-                        .catch(err => console.error('Ошибка сохранения:', err));
-                } else {
-                    // Если модальное окно скрыто, временно показываем его, делаем скриншот и прячем обратно
-                    // Это менее предпочтово, чем мой предыдущий ответ, но работает в рамках одной функции
-                    // Однако, в React лучше управлять этим через состояние, как в предыдущем ответе.
-                    // Но если мы хотим строго по твоему рабочему примеру, то можно так:
-                    // Создадим временный div вне модального окна, скопируем туда содержимое и спрячем
-                    const tempDiv = document.createElement('div');
-                    tempDiv.id = 'temp-screenshot-container';
-                    tempDiv.style.cssText = `
-                        position: absolute;
-                        top: -9999px;
-                        left: -9999px;
-                        width: fit-content;
-                        height: fit-content;
-                        background: white;
-                        padding: 16px; /* 4 * 4px */
-                        border-radius: 16px; /* 4 * 4px */
-                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-                    `;
-                    tempDiv.innerHTML = element.innerHTML;
-                    document.body.appendChild(tempDiv);
-
-                    html2canvas(tempDiv, { backgroundColor: '#ffffff', scale: 2 })
-                        .then(canvas => {
-                            const link = document.createElement('a');
-                            link.href = canvas.toDataURL('image/png');
-                            link.download = `rasklad-${Date.now()}.png`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            // Удаляем временный элемент
-                            document.body.removeChild(tempDiv);
-                        })
-                        .catch(err => console.error('Ошибка сохранения:', err));
-                }
+                // Теперь мы можем сразу захватить элемент, так как он отображает текущее состояние
+                 html2canvas(element, { backgroundColor: '#ffffff', scale: 2 })
+                    .then(canvas => {
+                        const link = document.createElement('a');
+                        link.href = canvas.toDataURL('image/png');
+                        link.download = `rasklad-${Date.now()}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    })
+                    .catch(err => console.error('Ошибка сохранения:', err));
             };
-            // --- /НОВАЯ ФУНКЦИЯ ---
+            // --- /ОБНОВЛЁННАЯ ФУНКЦИЯ ---
 
             return (
                 <div className="max-w-md mx-auto p-4 flex flex-col items-center">
@@ -185,6 +148,7 @@
 
                     {/* Card Grid Area */}
                     <div className="w-full bg-white/40 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/60 mb-6 relative overflow-hidden">
+                        {/* 2D Grid без 3D трансформаций */}
                         <div 
                             className="grid gap-3 transition-all duration-300 mx-auto"
                             style={{ 
@@ -195,24 +159,26 @@
                             {cards.map(card => (
                                 <div 
                                     key={card.id} 
-                                    className="w-[52px] h-[72px] perspective-1000 cursor-pointer"
+                                    className="w-[52px] h-[72px] cursor-pointer"
                                     onClick={() => handleCardClick(card.id)}
                                 >
-                                    <div className={`relative w-full h-full transition-all duration-500 preserve-3d ${(card.isOpen || isAllVisible) ? 'rotate-y-180' : ''}`}>
-                                        {/* Back (Rainbow) */}
-                                        <div className="absolute inset-0 card-back-rainbow rounded-lg border-2 border-yellow-200/50 flex items-center justify-center shadow-inner backface-hidden overflow-hidden">
+                                    {/* Условный рендеринг: либо рубашка, либо лицевая сторона */}
+                                    {!(card.isOpen || isAllVisible) ? (
+                                        // Рубашка
+                                        <div className="w-full h-full card-back-rainbow rounded-lg border-2 border-yellow-200/50 flex items-center justify-center shadow-inner overflow-hidden">
                                             <div className="w-8 h-12 border border-white/30 rounded flex items-center justify-center">
                                                 <span className="text-white/80 text-lg">◇</span>
                                             </div>
                                         </div>
-                                        {/* Front */}
-                                        <div className={`absolute inset-0 rounded-lg border-2 flex items-center justify-center rotate-y-180 backface-hidden bg-white shadow-sm overflow-hidden
+                                    ) : (
+                                        // Лицевая сторона
+                                        <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center bg-white shadow-sm overflow-hidden
                                             ${card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : 
                                               card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 
                                               'border-gray-200 text-gray-400'}`}>
                                             <span className="text-[10px] font-bold text-center leading-tight px-1 break-words">{card.label}</span>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -332,15 +298,13 @@
                         </div>
                     </div>
                     
-                    {/* Modal for Screenshot */}
-                    {/* Используем стили, аналогичные твоему рабочему примеру, но интегрированные в React */}
+                    {/* Modal for Screenshot - Updated for 2D */}
                     {isScreenshotModalOpen && (
                         <div id="screenshot-modal-overlay" className="fixed inset-0 bg-black/80 z-[2000] flex flex-col items-center justify-center p-4">
                             <div className="bg-white rounded-3xl p-6 max-w-full overflow-hidden flex flex-col items-center" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-gray-800 font-bold mb-4">Создание снимка</h3>
                                 
-                                {/* Контейнер для скриншота, копия сетки из основного UI */}
-                                {/* Важно: здесь отображаются только открытые карты или все, если isAllVisible true */}
+                                {/* Контейнер для скриншота, отображает ТЕКУЩЕЕ состояние сетки */}
                                 <div id="screenshot-area" className="p-4 bg-white rounded-2xl border border-gray-100">
                                     <div 
                                         className="grid gap-2"
@@ -351,15 +315,26 @@
                                     >
                                         {cards.map(card => (
                                             <div 
-                                                key={`ss-${card.id}`} // Изменил ключ для избежания конфликта с основной сеткой
-                                                className={`w-[48px] h-[64px] rounded-lg border-2 flex items-center justify-center text-center
-                                                    ${(card.isOpen || isAllVisible) 
-                                                        ? (card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-gray-400')
-                                                        : 'card-back-rainbow border-yellow-100'}`}
+                                                key={`ss-${card.id}`} // Уникальный ключ для модального окна
+                                                className="w-[48px] h-[64px]"
                                             >
-                                                <span className="text-[9px] font-bold leading-none break-all p-1">
-                                                    {(card.isOpen || isAllVisible) ? card.label : '◇'}
-                                                </span>
+                                                {/* Тоже условный рендеринг, отражающий текущее состояние на момент открытия модалки */}
+                                                {!(card.isOpen || isAllVisible) ? (
+                                                    // Рубашка
+                                                    <div className="w-full h-full card-back-rainbow rounded-lg border-2 border-yellow-100 flex items-center justify-center overflow-hidden">
+                                                        <div className="w-6 h-9 border border-white/30 rounded flex items-center justify-center">
+                                                            <span className="text-white/80 text-base">◇</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    // Лицевая сторона
+                                                    <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center text-center
+                                                        ${card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : 
+                                                          card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 
+                                                          'border-gray-200 text-gray-400'}`}>
+                                                        <span className="text-[9px] font-bold leading-tight px-0.5 break-words">{card.label}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
