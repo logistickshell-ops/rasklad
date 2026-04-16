@@ -1,0 +1,389 @@
+ <!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подсказка Интуиции</title>
+    <!-- Подключаем Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключаем библиотеки -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #e0f7fa 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        /* Радужная рубашка карт */
+        .card-back-rainbow {
+            background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fad0c4, #ffecd2, #a1c4fd, #c2e9fb, #d4fc79, #96e6a1);
+            background-size: 400% 400%;
+            animation: rainbowShift 10s ease infinite;
+        }
+        @keyframes rainbowShift {
+            0% { background-position: 0% 50% }
+            50% { background-position: 100% 50% }
+            100% { background-position: 0% 50% }
+        }
+        .perspective-1000 { perspective: 1000px; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const GRID_OPTIONS = [
+            { label: '4 × 3 (12 ячеек)', value: '4x3', w: 4, h: 3 },
+            { label: '3 × 4 (12 ячеек)', value: '3x4', w: 3, h: 4 },
+            { label: '2 × 2 (4 ячейки)', value: '2x2', w: 2, h: 2 },
+            { label: '1 × 5 (5 ячеек)', value: '1x5', w: 5, h: 1 },
+            { label: '5 × 1 (5 ячеек)', value: '5x1', w: 1, h: 5 },
+            { label: '3 × 3 (9 ячеек)', value: '3x3', w: 3, h: 3 },
+        ];
+
+        function App() {
+            const [winCount, setWinCount] = useState(2);
+            const [burnCount, setBurnCount] = useState(1);
+            const [gridValue, setGridValue] = useState('4x3');
+            const [winText, setWinText] = useState('');
+            const [burnText, setBurnText] = useState('');
+            const [cards, setCards] = useState([]);
+            const [isAllVisible, setIsAllVisible] = useState(false);
+            const [isScreenshotModalOpen, setIsScreenshotModalOpen] = useState(false);
+
+            const gridConfig = useMemo(() => GRID_OPTIONS.find(o => o.value === gridValue), [gridValue]);
+            const totalSpecial = winCount + burnCount;
+
+            const shuffleArray = (array) => {
+                const arr = [...array];
+                const randomValues = new Uint32Array(arr.length);
+                window.crypto.getRandomValues(randomValues);
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = randomValues[i] % (i + 1);
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            };
+
+            const generateLayout = () => {
+                const totalCells = gridConfig.w * gridConfig.h;
+                if (totalSpecial > totalCells) {
+                    alert('Ошибка: Карт больше, чем ячеек!');
+                    return;
+                }
+
+                let newCards = new Array(totalCells).fill(null).map((_, i) => ({
+                    id: i,
+                    type: 'neutral',
+                    isOpen: false,
+                    label: '·'
+                }));
+
+                const indices = shuffleArray([...Array(totalCells).keys()]);
+                const winIndices = indices.slice(0, winCount);
+                const burnIndices = indices.slice(winCount, winCount + burnCount);
+
+                const winLabels = winText.split(',').map(s => s.trim()).filter(Boolean);
+                const burnLabels = burnText.split(',').map(s => s.trim()).filter(Boolean);
+
+                winIndices.forEach((idx, i) => {
+                    newCards[idx].type = 'win';
+                    newCards[idx].label = winLabels[i] || '✦';
+                });
+
+                burnIndices.forEach((idx, i) => {
+                    newCards[idx].type = 'burn';
+                    newCards[idx].label = burnLabels[i] || '🔥';
+                });
+
+                setCards(newCards);
+                setIsAllVisible(false);
+            };
+
+            useEffect(() => { generateLayout(); }, [gridValue]);
+
+            const handleCardClick = (id) => {
+                setCards(prev => prev.map(c => c.id === id ? { ...c, isOpen: !c.isOpen } : c));
+            };
+
+            // --- НОВАЯ ФУНКЦИЯ ДЛЯ СКРИНШОТА ---
+            const captureAndDownload = () => {
+                const element = document.getElementById('screenshot-area');
+                if (!element) {
+                    console.error('Элемент #screenshot-area не найден для скриншота.');
+                    return;
+                }
+
+                // Проверяем, что модальное окно открыто, чтобы элемент был виден
+                // и html2canvas мог корректно его отрендерить
+                const modal = document.getElementById('screenshot-modal-overlay');
+                if (modal && modal.style.display !== 'none' && modal.style.opacity !== '0') {
+                     html2canvas(element, { backgroundColor: '#ffffff', scale: 2 })
+                        .then(canvas => {
+                            const link = document.createElement('a');
+                            link.href = canvas.toDataURL('image/png');
+                            link.download = `rasklad-${Date.now()}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        })
+                        .catch(err => console.error('Ошибка сохранения:', err));
+                } else {
+                    // Если модальное окно скрыто, временно показываем его, делаем скриншот и прячем обратно
+                    // Это менее предпочтительно, чем мой предыдущий ответ, но работает в рамках одной функции
+                    // Однако, в React лучше управлять этим через состояние, как в предыдущем ответе.
+                    // Но если мы хотим строго по твоему рабочему примеру, то можно так:
+                    // Создадим временный div вне модального окна, скопируем туда содержимое и спрячем
+                    const tempDiv = document.createElement('div');
+                    tempDiv.id = 'temp-screenshot-container';
+                    tempDiv.style.cssText = `
+                        position: absolute;
+                        top: -9999px;
+                        left: -9999px;
+                        width: fit-content;
+                        height: fit-content;
+                        background: white;
+                        padding: 16px; /* 4 * 4px */
+                        border-radius: 16px; /* 4 * 4px */
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                    `;
+                    tempDiv.innerHTML = element.innerHTML;
+                    document.body.appendChild(tempDiv);
+
+                    html2canvas(tempDiv, { backgroundColor: '#ffffff', scale: 2 })
+                        .then(canvas => {
+                            const link = document.createElement('a');
+                            link.href = canvas.toDataURL('image/png');
+                            link.download = `rasklad-${Date.now()}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            // Удаляем временный элемент
+                            document.body.removeChild(tempDiv);
+                        })
+                        .catch(err => console.error('Ошибка сохранения:', err));
+                }
+            };
+            // --- /НОВАЯ ФУНКЦИЯ ---
+
+            return (
+                <div className="max-w-md mx-auto p-4 flex flex-col items-center">
+                    {/* Header Label */}
+                    <div className="bg-white/50 backdrop-blur rounded-full px-4 py-1 text-[10px] text-purple-500 uppercase tracking-widest font-bold mb-6 shadow-sm border border-white/50">
+                        ✦ Светлый Расклад ✦
+                    </div>
+
+                    {/* Card Grid Area */}
+                    <div className="w-full bg-white/40 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/60 mb-6 relative overflow-hidden">
+                        <div 
+                            className="grid gap-3 transition-all duration-300 mx-auto"
+                            style={{ 
+                                gridTemplateColumns: `repeat(${gridConfig.w}, 52px)`,
+                                justifyContent: 'center'
+                            }}
+                        >
+                            {cards.map(card => (
+                                <div 
+                                    key={card.id} 
+                                    className="w-[52px] h-[72px] perspective-1000 cursor-pointer"
+                                    onClick={() => handleCardClick(card.id)}
+                                >
+                                    <div className={`relative w-full h-full transition-all duration-500 preserve-3d ${(card.isOpen || isAllVisible) ? 'rotate-y-180' : ''}`}>
+                                        {/* Back (Rainbow) */}
+                                        <div className="absolute inset-0 card-back-rainbow rounded-lg border-2 border-yellow-200/50 flex items-center justify-center shadow-inner backface-hidden overflow-hidden">
+                                            <div className="w-8 h-12 border border-white/30 rounded flex items-center justify-center">
+                                                <span className="text-white/80 text-lg">◇</span>
+                                            </div>
+                                        </div>
+                                        {/* Front */}
+                                        <div className={`absolute inset-0 rounded-lg border-2 flex items-center justify-center rotate-y-180 backface-hidden bg-white shadow-sm overflow-hidden
+                                            ${card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : 
+                                              card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 
+                                              'border-gray-200 text-gray-400'}`}>
+                                            <span className="text-[10px] font-bold text-center leading-tight px-1 break-words">{card.label}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="text-center mt-6 text-[10px] text-gray-400 italic">Нажмите на карту, чтобы открыть её</div>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="flex justify-between w-full gap-2 mb-6 text-[9px] font-medium uppercase tracking-tighter">
+                        <div className="flex-1 bg-white/60 p-2 rounded-xl border border-white/50 flex flex-col items-center">
+                            <span className="text-blue-400 mb-1">✦ —</span>
+                            <span className="text-gray-500">выигрышная карта</span>
+                        </div>
+                        <div className="flex-1 bg-white/60 p-2 rounded-xl border border-white/50 flex flex-col items-center">
+                            <span className="text-red-400 mb-1">🔥 — карта</span>
+                            <span className="text-gray-500">сжигания</span>
+                        </div>
+                        <div className="flex-1 bg-white/60 p-2 rounded-xl border border-white/50 flex flex-col items-center">
+                            <span className="text-gray-300 mb-1">· — нейтральная</span>
+                            <span className="text-gray-500">карта</span>
+                        </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="w-full bg-white/70 backdrop-blur rounded-3xl p-6 shadow-lg border border-white flex flex-col gap-5">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h2 className="text-gray-700 font-bold text-sm">Параметры расклада</h2>
+                                <p className="text-[9px] text-gray-400 leading-tight">Выигрышные и сжигающие — разные карты.</p>
+                            </div>
+                            <div className="bg-white border border-purple-100 rounded-xl px-3 py-2 text-center shadow-sm min-w-[60px]">
+                                <div className="text-[7px] text-purple-300 uppercase font-black mb-1">ОТКРЫВАЕТСЯ</div>
+                                <div className="text-lg font-bold text-gray-700">{totalSpecial}</div>
+                            </div>
+                        </div>
+
+                        {/* Steppers */}
+                        <div>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">ВЫИГРЫШНЫЕ</label>
+                            <div className="flex items-center bg-white rounded-xl border border-gray-100 px-3 py-1 shadow-sm">
+                                <button onClick={() => setWinCount(Math.max(0, winCount - 1))} className="text-gray-300 p-2 hover:text-purple-500">－</button>
+                                <input readOnly value={winCount} className="flex-1 text-center font-bold text-gray-700 bg-transparent outline-none" />
+                                <button onClick={() => setWinCount(winCount + 1)} className="text-gray-300 p-2 hover:text-purple-500">＋</button>
+                                <span className="ml-2">💎</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">СЖИГАЮЩИЕ</label>
+                            <div className="flex items-center bg-white rounded-xl border border-gray-100 px-3 py-1 shadow-sm">
+                                <button onClick={() => setBurnCount(Math.max(0, burnCount - 1))} className="text-gray-300 p-2 hover:text-purple-500">－</button>
+                                <input readOnly value={burnCount} className="flex-1 text-center font-bold text-gray-700 bg-transparent outline-none" />
+                                <button onClick={() => setBurnCount(burnCount + 1)} className="text-gray-300 p-2 hover:text-purple-500">＋</button>
+                                <span className="ml-2">🔥</span>
+                            </div>
+                        </div>
+
+                        {/* Layout Picker */}
+                        <div>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">РАСКЛАД</label>
+                            <select 
+                                value={gridValue} 
+                                onChange={(e) => setGridValue(e.target.value)}
+                                className="w-full bg-white rounded-xl border border-gray-100 px-4 py-2 text-sm font-medium text-gray-600 shadow-sm outline-none"
+                            >
+                                {GRID_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Text Inputs */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[9px] font-black text-green-500 uppercase mb-1 block">ТЕКСТ (ВЫИГРЫШ)</label>
+                                <input 
+                                    placeholder="напр. слива, яблоко" 
+                                    value={winText}
+                                    onChange={(e) => setWinText(e.target.value)}
+                                    className="w-full bg-green-50/30 rounded-xl border border-green-100 px-3 py-2 text-[10px] outline-none" 
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-red-500 uppercase mb-1 block">ТЕКСТ (СЖИГАНИЕ)</label>
+                                <input 
+                                    placeholder="напр. огонь" 
+                                    value={burnText}
+                                    onChange={(e) => setBurnText(e.target.value)}
+                                    className="w-full bg-red-50/30 rounded-xl border border-red-100 px-3 py-2 text-[10px] outline-none" 
+                                />
+                            </div>
+                        </div>
+
+                        {/* Buttons Grid */}
+                        <div className="grid grid-cols-2 gap-3 mt-2">
+                            <button onClick={generateLayout} className="bg-blue-50 text-blue-600 rounded-xl py-3 text-[10px] font-bold border border-blue-100 hover:bg-blue-100 transition-colors">
+                                ↺ Новый расклад
+                            </button>
+                            <button onClick={() => setIsAllVisible(true)} className="bg-yellow-50 text-yellow-600 rounded-xl py-3 text-[10px] font-bold border border-yellow-100 hover:bg-yellow-100 transition-colors">
+                                👁 Открыть всё
+                            </button>
+                            <button onClick={() => { setIsAllVisible(false); setCards(c => c.map(k => ({...k, isOpen: false}))) }} className="bg-white text-gray-400 rounded-xl py-3 text-[10px] font-bold border border-gray-100 hover:bg-gray-50 transition-colors">
+                                ☀️ Скрыть
+                            </button>
+                            <button onClick={() => setIsScreenshotModalOpen(true)} className="bg-cyan-50 text-cyan-600 rounded-xl py-3 text-[10px] font-bold border border-cyan-100 hover:bg-cyan-100 transition-colors">
+                                📷 Снимок
+                            </button>
+                        </div>
+
+                        {/* Bottom Stats */}
+                        <div className="pt-4 mt-2 border-t border-gray-50 flex justify-between items-center">
+                            <div className="text-[10px] text-gray-400">Открыто <span className="font-bold">{cards.filter(c => c.isOpen).length}</span> из {cards.length}</div>
+                            <div className="bg-gray-50 rounded-lg px-2 py-1 text-[10px] text-gray-400 font-mono tracking-tighter">{gridConfig.w} × {gridConfig.h}</div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <div className="flex-1 bg-green-50 text-green-500 rounded-full py-1 text-center text-[10px] font-bold">💎 {winCount}</div>
+                            <div className="flex-1 bg-red-50 text-red-500 rounded-full py-1 text-center text-[10px] font-bold">🔥 {burnCount}</div>
+                            <div className="flex-1 bg-blue-50 text-blue-500 rounded-full py-1 text-center text-[10px] font-bold">Ф {totalSpecial}</div>
+                        </div>
+                    </div>
+                    
+                    {/* Modal for Screenshot */}
+                    {/* Используем стили, аналогичные твоему рабочему примеру, но интегрированные в React */}
+                    {isScreenshotModalOpen && (
+                        <div id="screenshot-modal-overlay" className="fixed inset-0 bg-black/80 z-[2000] flex flex-col items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl p-6 max-w-full overflow-hidden flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-gray-800 font-bold mb-4">Создание снимка</h3>
+                                
+                                {/* Контейнер для скриншота, копия сетки из основного UI */}
+                                {/* Важно: здесь отображаются только открытые карты или все, если isAllVisible true */}
+                                <div id="screenshot-area" className="p-4 bg-white rounded-2xl border border-gray-100">
+                                    <div 
+                                        className="grid gap-2"
+                                        style={{ 
+                                            gridTemplateColumns: `repeat(${gridConfig.w}, 48px)`,
+                                            justifyContent: 'center'
+                                        }}
+                                    >
+                                        {cards.map(card => (
+                                            <div 
+                                                key={`ss-${card.id}`} // Изменил ключ для избежания конфликта с основной сеткой
+                                                className={`w-[48px] h-[64px] rounded-lg border-2 flex items-center justify-center text-center
+                                                    ${(card.isOpen || isAllVisible) 
+                                                        ? (card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-gray-400')
+                                                        : 'card-back-rainbow border-yellow-100'}`}
+                                            >
+                                                <span className="text-[9px] font-bold leading-none break-all p-1">
+                                                    {(card.isOpen || isAllVisible) ? card.label : '◇'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 text-center">
+                                        <div className="text-[10px] text-gray-400 uppercase font-black tracking-widest">СВЕТЛЫЙ РАСКЛАД</div>
+                                        <div className="text-[8px] text-gray-300 mt-1">{new Date().toLocaleString()}</div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 mt-6 w-full">
+                                    <button onClick={captureAndDownload} className="flex-1 bg-green-500 text-white rounded-xl py-3 font-bold text-xs hover:bg-green-600">
+                                        Сохранить как изображение
+                                    </button>
+                                    <button onClick={() => setIsScreenshotModalOpen(false)} className="bg-gray-100 text-gray-500 rounded-xl px-6 py-3 font-bold text-xs hover:bg-gray-200">
+                                        Закрыть
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
