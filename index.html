@@ -210,7 +210,8 @@
                                         // Рубашка
                                         <div className="w-full h-full card-back-rainbow rounded-lg border-2 border-yellow-200/50 flex items-center justify-center shadow-inner overflow-hidden">
                                             <div className="w-8 h-12 border border-white/30 rounded flex items-center justify-center">
-                                                <span className="text-white/80 text-lg">◇</span>
+                                                {/* Выводим номер карты на рубашке */}
+                                                <span className="text-white/80 text-base font-bold">{card.id + 1}</span>
                                             </div>
                                         </div>
                                     ) : (
@@ -366,7 +367,8 @@
                                                     // Рубашка
                                                     <div className="w-full h-full card-back-rainbow rounded-lg border-2 border-yellow-100 flex items-center justify-center overflow-hidden">
                                                         <div className="w-6 h-9 border border-white/30 rounded flex items-center justify-center">
-                                                            <span className="text-white/80 text-base">◇</span>
+                                                            {/* Выводим номер карты на рубашке в модалке */}
+                                                            <span className="text-white/80 text-sm font-bold">{card.id + 1}</span>
                                                         </div>
                                                     </div>
                                                 ) : (
