@@ -19,17 +19,21 @@
             min-height: 100vh;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        /* Радужная рубашка карт */
-        .card-back-rainbow {
+        /* Радужный фон как fallback для рубашки карт */
+        .card-back-rainbow-fallback {
+            /* Этот градиент теперь будет виден ТОЛЬКО если изображение не загрузится */
             background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fad0c4, #ffecd2, #a1c4fd, #c2e9fb, #d4fc79, #96e6a1);
             background-size: 400% 400%;
-            animation: rainbowShift 10s ease infinite;
+            animation: rainbowShiftFallback 10s ease infinite;
         }
-        @keyframes rainbowShift {
+        @keyframes rainbowShiftFallback {
             0% { background-position: 0% 50% }
             50% { background-position: 100% 50% }
             100% { background-position: 0% 50% }
         }
+
+        /* --- Убрали CSS-классы для изображения рубашки, теперь используем <img> --- */
+
     </style>
 </head>
 <body>
@@ -112,75 +116,93 @@
                 setCards(prev => prev.map(c => c.id === id ? { ...c, isOpen: !c.isOpen } : c));
             };
 
-            // --- ОБНОВЛЁННАЯ ФУНКЦИЯ ДЛЯ СКРИНШОТА ---
-            const captureAndDownload = () => {
+            // --- ОБНОВЛЁННАЯ ФУНКЦИЯ ДЛЯ СКРИНШОТА (для основного вида) ---
+            const captureAndDownloadMain = () => {
                 const element = document.getElementById('screenshot-area');
                 if (!element) {
                     console.error('Элемент #screenshot-area не найден для скриншота.');
                     return;
                 }
 
-                // Добавим небольшую задержку, чтобы убедиться, что DOM стабилен
+                // Задержка перед снимком для модального окна
                 setTimeout(() => {
-                    html2canvas(element, { 
-                        backgroundColor: '#ffffff', 
-                        scale: 2,
-                        // Попробуем отключить анимации на время снимка
-                        // https://html2canvas.hertzen.com/configuration
-                        // logging: true, // Для отладки в консоли
-                        useCORS: true, // Полезно для внешних ресурсов, если есть
-                        allowTaint: true // Позволить загрязнение canvas внешними ресурсами
+                    html2canvas(element, {
+                        backgroundColor: '#ffffff',
+                        scale: 2, // Увеличиваем масштаб для лучшего качества
+                        useCORS: true, // ВАЖНО для изображений с GitHub
+                        allowTaint: true,
+                        // logging: true, // Раскомментируй для отладки в консоли
                     })
                     .then(canvas => {
-                        // Создаем Blob из canvas
                         canvas.toBlob(function(blob) {
                             if (!blob) {
                                 console.error('Не удалось создать Blob из canvas.');
                                 return;
                             }
-
-                            // Создаем URL для Blob
                             const url = URL.createObjectURL(blob);
-
-                            // Создаем временную ссылку
                             const link = document.createElement('a');
                             link.href = url;
-                            link.download = `rasklad-${Date.now()}.png`; // Предлагаемое имя файла
-
-                            // Пытаемся "кликнуть" по ссылке
-                            // В TG WebApp это может не сработать напрямую
-                            // Но часто браузер открывает изображение по ссылке, и пользователь может его сохранить
+                            link.download = `rasklad-${Date.now()}.png`;
                             document.body.appendChild(link);
-                            
-                            // Попробуем стандартный способ
                             try {
                                 link.click();
                             } catch (err) {
-                                // Если click() не сработал (обычно из-за политики безопасности)
-                                // Откроем изображение в новой вкладке/окне
-                                // В TG это может открыть изображение встроенном браузере
                                 window.open(url, '_blank');
                             }
-
-                            // Очищаем ресурсы
                             document.body.removeChild(link);
-                            // Не забудьте освободить URL объекта после использования
-                            setTimeout(() => URL.revokeObjectURL(url), 100); 
+                            setTimeout(() => URL.revokeObjectURL(url), 100);
                         }, 'image/png');
                     })
                     .catch(err => {
-                        console.error('Ошибка html2canvas:', err);
-                        // Попробуем открыть canvas в новом окне как fallback
-                        // canvas.toBlob(function(blob) {
-                        //     if (blob) {
-                        //         const url = URL.createObjectURL(blob);
-                        //         window.open(url, '_blank');
-                        //     }
-                        // });
+                        console.error('Ошибка html2canvas (main):', err);
                     });
-                }, 100); // Задержка 100мс
+                }, 200); // Небольшая задержка
             };
             // --- /ОБНОВЛЁННАЯ ФУНКЦИЯ ---
+
+             // --- ФУНКЦИЯ ДЛЯ СКРИНШОТА ИЗ МОДАЛЬНОГО ОКНА ---
+             const captureAndDownloadModal = () => {
+                 const element = document.getElementById('screenshot-area-modal');
+                 if (!element) {
+                     console.error('Элемент #screenshot-area-modal не найден для скриншота.');
+                     return;
+                 }
+
+                 // Добавляем задержку, чтобы точно дождаться отрисовки изображений
+                 setTimeout(() => {
+                     html2canvas(element, {
+                         backgroundColor: '#ffffff',
+                         scale: 2, // Увеличиваем масштаб для лучшего качества
+                         useCORS: true,
+                         allowTaint: true
+                         // logging: true // Раскомментируй для отладки
+                     })
+                     .then(canvas => {
+                         canvas.toBlob(function(blob) {
+                             if (!blob) {
+                                 console.error('Не удалось создать Blob из canvas (modal).');
+                                 return;
+                             }
+                             const url = URL.createObjectURL(blob);
+                             const link = document.createElement('a');
+                             link.href = url;
+                             link.download = `rasklad_modal-${Date.now()}.png`;
+                             document.body.appendChild(link);
+                             try {
+                                 link.click();
+                             } catch (err) {
+                                 window.open(url, '_blank');
+                             }
+                             document.body.removeChild(link);
+                             setTimeout(() => URL.revokeObjectURL(url), 100);
+                         }, 'image/png');
+                     })
+                     .catch(err => {
+                         console.error('Ошибка html2canvas (modal):', err);
+                     });
+                 }, 500); // Задержка 500мс, чтобы изображения точно прогрузились
+             };
+             // --- /ФУНКЦИЯ ---
 
             return (
                 <div className="max-w-md mx-auto p-4 flex flex-col items-center">
@@ -207,13 +229,24 @@
                                 >
                                     {/* Условный рендеринг: либо рубашка, либо лицевая сторона */}
                                     {!(card.isOpen || isAllVisible) ? (
-                                        // Рубашка
-                                        <div className="w-full h-full card-back-rainbow rounded-lg border-2 border-yellow-200/50 flex items-center justify-center shadow-inner overflow-hidden">
-                                            <div className="w-8 h-12 border border-white/30 rounded flex items-center justify-center">
-                                                {/* Выводим номер карты на рубашке */}
-                                                <span className="text-white/80 text-base font-bold">{card.id + 1}</span>
-                                            </div>
-                                        </div>
+                                        // Рубашка - теперь используем img для фона, без z-index
+                                        <div className="w-full h-full card-back-rainbow-fallback rounded-lg border-2 border-yellow-200/50 shadow-inner overflow-hidden flex items-center justify-center relative">
+                                             {/* Изображение рубашки как img-тег - первый элемент */}
+                                             <img
+                                                 src="https://raw.githubusercontent.com/logistickshell-ops/rasklad/main/rub.jpg" /* <-- ЗДЕСЬ УКАЗАТЬ СВОЙ ПУТЬ К ИЗОБРАЖЕНИЮ НА ГИТХАБЕ */
+                                                 alt="Card Back"
+                                                 className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                                                 // onLoad={() => console.log('Image loaded')} // Можно использовать для отладки
+                                                 // onError={() => console.log('Image failed to load')} // Можно использовать для отладки
+                                             />
+                                             {/* Обертка для цифры - второй элемент, поэтому визуально поверх img */}
+                                             {/* Изменённые классы: flex-col justify-end items-start --> выравнивание по нижнему краю и левому краю */}
+                                             <div className="w-full h-full flex flex-col justify-end items-start pl-1 pb-1 absolute inset-0 pointer-events-none"> {/* <-- Выравнивание цифры изменено на bottom-left */}
+                                                 <div className="w-8 h-12 border border-white/30 rounded flex items-center justify-center">
+                                                     <span className="text-yellow-300 text-base font-bold">{card.id + 1}</span> {/* Цвет изменён на ярко-лимонный */}
+                                                 </div>
+                                             </div>
+                                         </div>
                                     ) : (
                                         // Лицевая сторона
                                         <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center bg-white shadow-sm overflow-hidden
@@ -342,14 +375,15 @@
                         </div>
                     </div>
                     
-                    {/* Modal for Screenshot - Updated for 2D */}
+                    {/* Modal for Screenshot - Updated for 2D and Image Background */}
                     {isScreenshotModalOpen && (
                         <div id="screenshot-modal-overlay" className="fixed inset-0 bg-black/80 z-[2000] flex flex-col items-center justify-center p-4">
                             <div className="bg-white rounded-3xl p-6 max-w-full overflow-hidden flex flex-col items-center" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-gray-800 font-bold mb-4">Создание снимка</h3>
                                 
                                 {/* Контейнер для скриншота, отображает ТЕКУЩЕЕ состояние сетки */}
-                                <div id="screenshot-area" className="p-4 bg-white rounded-2xl border border-gray-100">
+                                {/* Добавлен ID для модального скриншота */}
+                                <div id="screenshot-area-modal" className="p-4 bg-white rounded-2xl border border-gray-100">
                                     <div 
                                         className="grid gap-2"
                                         style={{ 
@@ -364,13 +398,21 @@
                                             >
                                                 {/* Тоже условный рендеринг, отражающий текущее состояние на момент открытия модалки */}
                                                 {!(card.isOpen || isAllVisible) ? (
-                                                    // Рубашка
-                                                    <div className="w-full h-full card-back-rainbow rounded-lg border-2 border-yellow-100 flex items-center justify-center overflow-hidden">
-                                                        <div className="w-6 h-9 border border-white/30 rounded flex items-center justify-center">
-                                                            {/* Выводим номер карты на рубашке в модалке */}
-                                                            <span className="text-white/80 text-sm font-bold">{card.id + 1}</span>
-                                                        </div>
-                                                    </div>
+                                                    // Рубашка - используем img для фона в модальном окне, без z-index
+                                                    <div className="w-full h-full card-back-rainbow-fallback rounded-lg border-2 border-yellow-100 overflow-hidden flex items-center justify-center relative">
+                                                         <img
+                                                             src="https://raw.githubusercontent.com/logistickshell-ops/rasklad/main/rub.jpg" /* <-- ЗДЕСЬ ТОТ ЖЕ ПУТЬ К ИЗОБРАЖЕНИЮ НА ГИТХАБЕ */
+                                                             alt="Card Back Modal"
+                                                             className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                                                         />
+                                                         {/* Обертка для цифры - второй элемент, поэтому визуально поверх img */}
+                                                         {/* Изменённые классы: flex-col justify-end items-start --> выравнивание по нижнему краю и левому краю */}
+                                                         <div className="w-full h-full flex flex-col justify-end items-start pl-1 pb-1 absolute inset-0 pointer-events-none"> {/* <-- Выравнивание цифры изменено на bottom-left */}
+                                                             <div className="w-6 h-9 border border-white/30 rounded flex items-center justify-center">
+                                                                 <span className="text-yellow-300 text-sm font-bold">{card.id + 1}</span> {/* Цвет изменён на ярко-лимонный */}
+                                                             </div>
+                                                         </div>
+                                                     </div>
                                                 ) : (
                                                     // Лицевая сторона
                                                     <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center text-center
@@ -390,7 +432,8 @@
                                 </div>
 
                                 <div className="flex gap-3 mt-6 w-full">
-                                    <button onClick={captureAndDownload} className="flex-1 bg-green-500 text-white rounded-xl py-3 font-bold text-xs hover:bg-green-600">
+                                    {/* Вызов обновлённой функции для модального окна */}
+                                    <button onClick={captureAndDownloadModal} className="flex-1 bg-green-500 text-white rounded-xl py-3 font-bold text-xs hover:bg-green-600">
                                         Сохранить как изображение
                                     </button>
                                     <button onClick={() => setIsScreenshotModalOpen(false)} className="bg-gray-100 text-gray-500 rounded-xl px-6 py-3 font-bold text-xs hover:bg-gray-200">
@@ -407,5 +450,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+<br><center>© 2026 created Disa. <br>
 </body>
 </html>
