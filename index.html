@@ -32,11 +32,7 @@
             100% { background-position: 0% 50% }
         }
 
-        /* Fallback для лицевой стороны */
-        .card-front-fallback {
-            background-color: white; /* Белый фон как резервный вариант */
-            /* можно добавить градиент или текстуру */
-        }
+        /* --- Убрали CSS-классы для изображения рубашки, теперь используем <img> --- */
 
     </style>
 </head>
@@ -55,24 +51,12 @@
             { label: '3 × 3 (9 ячеек)', value: '3x3', w: 3, h: 3 },
         ];
 
-        // --- СПИСОК ИМЁН ИЗОБРАЖЕНИЙ НА ГИТХАБЕ ---
-        // Замените этот список на свои 64 названия файлов (без расширения)
-        const cardImagesList = [
-            'ladа', 'sun', 'moon', 'fire', 'water', 'earth', 'air', 'tree', 'flower', 'bird', 'fish', 'star', 'cloud', 'rain', 'snow', 'wind',
-            'mountain', 'river', 'lake', 'forest', 'desert', 'ocean', 'island', 'cave', 'valley', 'hill', 'plain', 'glacier', 'volcano', 'geyser', 'spring',
-            'autumn', 'summer', 'winter', 'spring_season', 'dawn', 'noon', 'sunset', 'night', 'comet', 'planet', 'galaxy', 'nebula', 'asteroid', 'meteor',
-            'crystal', 'gem', 'metal', 'wood', 'stone', 'sand', 'salt', 'sugar', 'ice', 'steam', 'magma', 'lava', 'ash', 'dust', 'clay', 'brick',
-            'paper', 'book', 'scroll', 'quill', 'ink', 'paint', 'brush', 'canvas', 'frame', 'art', 'music', 'dance', 'poetry', 'story', 'dream'
-            // Добавьте сюда все 64 названия
-        ];
-        // ----------------------------------------
-
         function App() {
             const [winCount, setWinCount] = useState(2);
             const [burnCount, setBurnCount] = useState(1);
             const [gridValue, setGridValue] = useState('4x3');
-            const [winText, setWinText] = useState(''); // Теперь это будет список имён изображений
-            const [burnText, setBurnText] = useState(''); // Теперь это будет список имён изображений
+            const [winText, setWinText] = useState('');
+            const [burnText, setBurnText] = useState('');
             const [cards, setCards] = useState([]);
             const [isAllVisible, setIsAllVisible] = useState(false);
             const [isScreenshotModalOpen, setIsScreenshotModalOpen] = useState(false);
@@ -98,87 +82,35 @@
                     return;
                 }
 
-                // Парсим введённые пользователем имена
-                const winLabels = winText.split(',').map(s => s.trim()).filter(Boolean);
-                const burnLabels = burnText.split(',').map(s => s.trim()).filter(Boolean);
-
-                // Проверяем, что не введено больше имён, чем нужно
-                if (winLabels.length > winCount) {
-                    alert(`Введено слишком много имён для выигрышных карт. Максимум: ${winCount}`);
-                    return;
-                }
-                if (burnLabels.length > burnCount) {
-                    alert(`Введено слишком много имён для сжигающих карт. Максимум: ${burnCount}`);
-                    return;
-                }
-
                 let newCards = new Array(totalCells).fill(null).map((_, i) => ({
                     id: i,
                     type: 'neutral',
                     isOpen: false,
-                    label: '', // Будет содержать имя изображения
-                    imageLoaded: false // Состояние загрузки изображения
+                    label: '·'
                 }));
 
                 const indices = shuffleArray([...Array(totalCells).keys()]);
+                const winIndices = indices.slice(0, winCount);
+                const burnIndices = indices.slice(winCount, winCount + burnCount);
 
-                // --- РАСПРЕДЕЛЕНИЕ ТИПОВ И ИМЁН ---
-                // Сначала выделяем индексы для специальных карт
-                const allSpecialIndices = indices.slice(0, totalSpecial);
-                const winIndices = allSpecialIndices.slice(0, winCount);
-                const burnIndices = allSpecialIndices.slice(winCount);
+                const winLabels = winText.split(',').map(s => s.trim()).filter(Boolean);
+                const burnLabels = burnText.split(',').map(s => s.trim()).filter(Boolean);
 
-                // Создаём список всех доступных имён изображений (для рандома)
-                const allAvailableNames = [...cardImagesList];
-
-                // --- НАЗНАЧЕНИЕ ВЫИГРЫШНЫХ КАРТ ---
                 winIndices.forEach((idx, i) => {
-                    if (i < winLabels.length) {
-                        // Если есть введённое имя, используем его
-                        newCards[idx].type = 'win';
-                        newCards[idx].label = winLabels[i];
-                    } else {
-                        // Если введённых имён меньше, чем winCount, выбираем рандомное
-                        if (allAvailableNames.length > 0) {
-                            const randomIndex = Math.floor(Math.random() * allAvailableNames.length);
-                            newCards[idx].type = 'win';
-                            newCards[idx].label = allAvailableNames.splice(randomIndex, 1)[0];
-                        }
-                    }
+                    newCards[idx].type = 'win';
+                    newCards[idx].label = winLabels[i] || '✦';
                 });
 
-                // --- НАЗНАЧЕНИЕ СЖИГАЮЩИХ КАРТ ---
                 burnIndices.forEach((idx, i) => {
-                    if (i < burnLabels.length) {
-                        // Если есть введённое имя, используем его
-                        newCards[idx].type = 'burn';
-                        newCards[idx].label = burnLabels[i];
-                    } else {
-                        // Если введённых имён меньше, чем burnCount, выбираем рандомное
-                        if (allAvailableNames.length > 0) {
-                            const randomIndex = Math.floor(Math.random() * allAvailableNames.length);
-                            newCards[idx].type = 'burn';
-                            newCards[idx].label = allAvailableNames.splice(randomIndex, 1)[0];
-                        }
-                    }
+                    newCards[idx].type = 'burn';
+                    newCards[idx].label = burnLabels[i] || '🔥';
                 });
-
-                // --- НАЗНАЧЕНИЕ НЕЙТРАЛЬНЫХ КАРТ ---
-                const neutralIndices = indices.slice(totalSpecial);
-                neutralIndices.forEach(idx => {
-                    if (allAvailableNames.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * allAvailableNames.length);
-                        newCards[idx].type = 'neutral';
-                        newCards[idx].label = allAvailableNames.splice(randomIndex, 1)[0];
-                    }
-                });
-                // -----------------------------------
 
                 setCards(newCards);
                 setIsAllVisible(false);
             };
 
-            useEffect(() => { generateLayout(); }, [gridValue]); // Срабатывает при изменении сетки
+            useEffect(() => { generateLayout(); }, [gridValue]);
 
             const handleCardClick = (id) => {
                 setCards(prev => prev.map(c => c.id === id ? { ...c, isOpen: !c.isOpen } : c));
@@ -272,14 +204,6 @@
              };
              // --- /ФУНКЦИЯ ---
 
-            // --- Функция для получения URL изображения ---
-            const getCardImageUrl = (imageName) => {
-                // Замените путь к репозиторию и папке с изображениями на свой
-                // Пример: https://raw.githubusercontent.com/логин/репо/ветка/assets/images/cards/lada.jpg
-                return `https://raw.githubusercontent.com/logistickshell-ops/rasklad/main/assets/images/cards/${imageName}.jpg`; // <-- ЗДЕСЬ УКАЗАТЬ СВОЙ ПУТЬ К ИЗОБРАЖЕНИЯМ НА ГИТХАБЕ
-            };
-            // --- /Функция ---
-
             return (
                 <div className="max-w-md mx-auto p-4 flex flex-col items-center">
                     {/* Header Label */}
@@ -324,24 +248,13 @@
                                              </div>
                                          </div>
                                     ) : (
-                                        // Лицевая сторона - теперь тоже изображение
-                                        <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center bg-white shadow-sm overflow-hidden card-front-fallback`}> {/* Добавлен fallback класс */}
-                                             <img
-                                                 src={getCardImageUrl(card.label)} // Используем функцию для формирования URL
-                                                 alt={`${card.type}: ${card.label}`}
-                                                 className="w-full h-full object-cover" // Заполняем область, обрезаем при необходимости
-                                                 onError={(e) => {
-                                                     // Если изображение не загрузилось, скрываем его и показываем fallback
-                                                     e.target.style.display = 'none';
-                                                     // Можно добавить placeholder или текст ошибки внутрь контейнера
-                                                     // Для простоты оставим только fallback фон
-                                                 }}
-                                                 onLoad={(e) => {
-                                                     // При успешной загрузке показываем изображение
-                                                     e.target.style.display = '';
-                                                 }}
-                                             />
-                                         </div>
+                                        // Лицевая сторона
+                                        <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center bg-white shadow-sm overflow-hidden
+                                            ${card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : 
+                                              card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 
+                                              'border-gray-200 text-gray-400'}`}>
+                                            <span className="text-[10px] font-bold text-center leading-tight px-1 break-words">{card.label}</span>
+                                        </div>
                                     )}
                                 </div>
                             ))}
@@ -416,7 +329,7 @@
                             <div>
                                 <label className="text-[9px] font-black text-green-500 uppercase mb-1 block">ТЕКСТ (ВЫИГРЫШ)</label>
                                 <input 
-                                    placeholder="напр. лада, солнце" 
+                                    placeholder="напр. слива, яблоко" 
                                     value={winText}
                                     onChange={(e) => setWinText(e.target.value)}
                                     className="w-full bg-green-50/30 rounded-xl border border-green-100 px-3 py-2 text-[10px] outline-none" 
@@ -425,7 +338,7 @@
                             <div>
                                 <label className="text-[9px] font-black text-red-500 uppercase mb-1 block">ТЕКСТ (СЖИГАНИЕ)</label>
                                 <input 
-                                    placeholder="напр. огонь, гнев" 
+                                    placeholder="напр. огонь" 
                                     value={burnText}
                                     onChange={(e) => setBurnText(e.target.value)}
                                     className="w-full bg-red-50/30 rounded-xl border border-red-100 px-3 py-2 text-[10px] outline-none" 
@@ -501,23 +414,12 @@
                                                          </div>
                                                      </div>
                                                 ) : (
-                                                    // Лицевая сторона - тоже изображение в модальном окне
-                                                    <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center text-center card-front-fallback`}> {/* Добавлен fallback класс */}
-                                                         <img
-                                                             src={getCardImageUrl(card.label)} // Используем функцию для формирования URL
-                                                             alt={`${card.type}: ${card.label} Modal`}
-                                                             className="w-full h-full object-cover"
-                                                             onError={(e) => {
-                                                                 // Если изображение не загрузилось, скрываем его и показываем fallback
-                                                                 e.target.style.display = 'none';
-                                                                 // Можно добавить placeholder или текст ошибки внутрь контейнера
-                                                                 // Для простоты оставим только fallback фон
-                                                             }}
-                                                             onLoad={(e) => {
-                                                                 // При успешной загрузке показываем изображение
-                                                                 e.target.style.display = '';
-                                                             }}
-                                                         />
+                                                    // Лицевая сторона
+                                                    <div className={`w-full h-full rounded-lg border-2 flex items-center justify-center text-center
+                                                        ${card.type === 'win' ? 'border-green-400 text-green-600 bg-green-50' : 
+                                                          card.type === 'burn' ? 'border-red-400 text-red-600 bg-red-50' : 
+                                                          'border-gray-200 text-gray-400'}`}>
+                                                        <span className="text-[9px] font-bold leading-tight px-0.5 break-words">{card.label}</span>
                                                     </div>
                                                 )}
                                             </div>
