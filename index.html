@@ -39,6 +39,7 @@
 <body>
     <div id="root"></div>
 
+    <!-- Основной React-код -->
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
@@ -447,6 +448,7 @@
             );
         }
 
+        // Точка входа после определения App
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
